@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   LayoutAnimation,
   Platform,
-  Keyboard
+  Keyboard,
+  Easing
 } from 'react-native';
 
 import FloatingActionItem from './FloatingActionItem';
@@ -29,8 +30,8 @@ class FloatingAction extends Component {
       keyboardHeight: 0
     };
 
-    this.mainBottomAnimation = new Animated.Value(props.distanceToEdge + props.mainVerticalDistance);
-    this.actionsBottomAnimation = new Animated.Value(ACTION_BUTTON_SIZE + props.distanceToEdge + props.actionsPaddingTopBottom + props.mainVerticalDistance);
+    this.mainBottomAnimation = new Animated.Value(0);
+    this.actionsBottomAnimation = new Animated.Value(0);
     this.animation = new Animated.Value(0);
     this.actionsAnimation = new Animated.Value(0);
     this.visibleAnimation = new Animated.Value(props.visible ? 0 : 1);
@@ -60,13 +61,13 @@ class FloatingAction extends Component {
     if (nextProps.visible !== this.props.visible) {
       if (nextProps.visible) {
         Animated.parallel([
-          Animated.spring(this.visibleAnimation, { toValue: 0 }),
-          Animated.spring(this.fadeAnimation, { toValue: 1 })
+          Animated.spring(this.visibleAnimation, { toValue: 0, duration: 250, useNativeDriver: true, bounciness: 0, }),
+          Animated.spring(this.fadeAnimation, { toValue: 1, duration: 250, useNativeDriver: true, bounciness: 0, })
         ]).start();
       } if (!nextProps.visible) {
         Animated.parallel([
-          Animated.spring(this.visibleAnimation, { toValue: 1 }),
-          Animated.spring(this.fadeAnimation, { toValue: 0 })
+          Animated.spring(this.visibleAnimation, { toValue: 1, duration: 250, useNativeDriver: true, bounciness: 0, }),
+          Animated.spring(this.fadeAnimation, { toValue: 0, duration: 250, useNativeDriver: true, bounciness: 0, })
         ]).start();
       }
     }
@@ -90,16 +91,18 @@ class FloatingAction extends Component {
         this.actionsBottomAnimation,
         {
           bounciness: 0,
-          toValue: (ACTION_BUTTON_SIZE + distanceToEdge + actionsPaddingTopBottom + height) - (isIphoneX() ? 40 : 0),
-          duration: 250
+          toValue: 0 - ((ACTION_BUTTON_SIZE + distanceToEdge + actionsPaddingTopBottom + height) - (isIphoneX() ? 40 : 0)),
+          duration: 500,
+          useNativeDriver: true
         }
       ),
       Animated.spring(
         this.mainBottomAnimation,
         {
           bounciness: 0,
-          toValue: (distanceToEdge + height) - (isIphoneX() ? 40 : 0),
-          duration: 250
+          toValue: 0 - ((distanceToEdge + height) - (isIphoneX() ? 40 : 0)),
+          duration: 500,
+          useNativeDriver: true
         }
       )
     ]).start();
@@ -113,16 +116,18 @@ class FloatingAction extends Component {
         this.actionsBottomAnimation,
         {
           bounciness: 0,
-          toValue: ACTION_BUTTON_SIZE + distanceToEdge + actionsPaddingTopBottom,
-          duration: 250
+          toValue: 0,
+          duration: 250, 
+          useNativeDriver: true
         }
       ),
       Animated.spring(
         this.mainBottomAnimation,
         {
           bounciness: 0,
-          toValue: distanceToEdge,
-          duration: 250
+          toValue: 0,
+          duration: 250, 
+          useNativeDriver: true
         }
       )
     ]).start();
@@ -168,15 +173,10 @@ class FloatingAction extends Component {
   };
 
   reset = () => {
-    Animated.spring(this.animation, { toValue: 0 }).start();
-    Animated.spring(this.actionsAnimation, { toValue: 0 }).start();
-    this.setState({
-      active: false
-    }, () => {
-      if (this.props.onClose) {
-        this.props.onClose();
-      }
-    });
+    Animated.parallel([
+      Animated.spring(this.animation, { toValue: 0, duration: 250, useNativeDriver: true, bounciness: 0, }),
+      Animated.spring(this.actionsAnimation, { toValue: 0, duration: 250, useNativeDriver: true, bounciness: 0 })
+    ]).start(() => { this.setState({ active: false }) });
   };
 
   animateButton = () => {
@@ -205,19 +205,19 @@ class FloatingAction extends Component {
 
     if (!active) {
       if (!floatingIcon) {
-        Animated.spring(this.animation, { toValue: 1 }).start();
+        Animated.spring(this.animation, { toValue: 1, duration: 250, useNativeDriver: true, bounciness: 0, }).start();
       }
 
-      Animated.spring(this.actionsAnimation, { toValue: 1 }).start();
+      Animated.spring(this.actionsAnimation, { toValue: 1, duration: 250, useNativeDriver: true, bounciness: 0, }).start();
 
       // only execute it for the background to prevent extra calls
-      LayoutAnimation.configureNext({
-        duration: 180,
+      /* LayoutAnimation.configureNext({
+        duration: 250,
         create: {
           type: LayoutAnimation.Types.easeInEaseOut,
           property: LayoutAnimation.Properties.opacity
         }
-      });
+      }); */
 
       this.setState({
         active: true
@@ -250,16 +250,9 @@ class FloatingAction extends Component {
     const animatedVisibleView = {
       opacity: this.fadeAnimation,
       transform: [{
-        rotate: this.visibleAnimation.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['0deg', '90deg']
-        })
-      }, {
-        scale: this.visibleAnimation.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 0]
-        })
-      }]
+        translateY: this.mainBottomAnimation
+        }
+      ]
     };
 
     let animatedViewStyle = {
@@ -278,7 +271,7 @@ class FloatingAction extends Component {
     const Touchable = getTouchableComponent();
     const propStyles = {
       backgroundColor: mainButtonColor,
-      bottom: this.mainBottomAnimation // I need to imporove this to run on native thread and not on JS thread
+      bottom: distanceToEdge
     };
 
     if (['left', 'right'].indexOf(position) > -1) {
@@ -293,8 +286,6 @@ class FloatingAction extends Component {
           propStyles,
           animatedVisibleView
         ]}
-        accessible={true}
-        accessibilityLabel={'Floating Action Button'}
       >
         <Touchable
           {...getRippleProps(mainButtonColor)}
@@ -340,7 +331,12 @@ class FloatingAction extends Component {
       styles[`${position}Actions`],
       animatedActionsStyle,
       {
-        bottom: this.actionsBottomAnimation
+        bottom: distanceToEdge+actionsPaddingTopBottom+ACTION_BUTTON_SIZE
+      },
+      {
+        transform: [{
+          translateY: this.actionsBottomAnimation
+        }]
       }
     ];
 
@@ -381,20 +377,13 @@ class FloatingAction extends Component {
 
     // TouchableOpacity don't require a child
     return (
-      <TouchableOpacity
-        activeOpacity={1}
-        style={[styles.overlay, { backgroundColor: overlayColor }]}
-        onPress={this.handlePressBackdrop}
-      />
+      <Animated.View style={[styles.overlay, { opacity: this.actionsAnimation }]}>
+        <TouchableOpacity
+          style={[styles.overlay, { backgroundColor: overlayColor }]}
+          onPress={this.reset}
+        />
+      </Animated.View>
     );
-  }
-
-  handlePressBackdrop = () => {
-    const { onPressBackdrop } = this.props;
-    if (onPressBackdrop) {
-      onPressBackdrop();
-    }
-    this.reset();
   }
 
   render() {
@@ -433,7 +422,6 @@ FloatingAction.propTypes = {
   })),
   color: PropTypes.string,
   distanceToEdge: PropTypes.number,
-  mainVerticalDistance: PropTypes.number,
   visible: PropTypes.bool,
   overlayColor: PropTypes.string,
   position: PropTypes.oneOf(['right', 'left', 'center']),
@@ -465,8 +453,7 @@ FloatingAction.defaultProps = {
   openOnMount: false,
   showBackground: true,
   iconHeight: 15,
-  iconWidth: 15,
-  mainVerticalDistance: 0
+  iconWidth: 15
 };
 
 const styles = StyleSheet.create({
